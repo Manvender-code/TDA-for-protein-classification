@@ -48,7 +48,7 @@ def main():
     # Save metrics
     save_metrics(metrics, os.path.join(OUTPUT_DIR, "metrics.csv"))
 
-    # ROC
+    # ROC curve
     fpr, tpr, auc = roc_data
     plot_roc_curve(fpr, tpr, auc,
                    os.path.join(OUTPUT_DIR, "roc_curve.png"))
