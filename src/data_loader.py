@@ -7,8 +7,10 @@ from src.config import DATA_DIR, DATASET_URL, DATASET_NAME
 
 
 def download_data():
+    """
+    Download and extract the PROTEINS_full dataset (TUDataset style).
+    """
     os.makedirs(DATA_DIR, exist_ok=True)
-
     zip_path = os.path.join(DATA_DIR, f"{DATASET_NAME}.zip")
     extract_path = os.path.join(DATA_DIR, DATASET_NAME)
 
@@ -26,35 +28,46 @@ def download_data():
 
 
 def load_graphs():
-
-    # loading the graph and converting it in networkx graph structure in an array and also its labeling(binary) as graph and binary_labels
-
+    """
+    Parses TUDataset raw files into NetworkX graphs with node attributes.
+    Returns:
+        graphs (list): List of nx.Graph objects
+        labels (np.array): Binary labels (Enzyme=1, Non-Enzyme=0)
+    """
     base = os.path.join(DATA_DIR, DATASET_NAME, DATASET_NAME)
 
+    # Load raw text files (TUDataset format)
     graph_indicator = np.loadtxt(f"{base}_graph_indicator.txt", dtype=int)
     edges = np.loadtxt(f"{base}_A.txt", delimiter=",", dtype=int)
     labels = np.loadtxt(f"{base}_graph_labels.txt", dtype=int)
     node_attr = np.loadtxt(f"{base}_node_attributes.txt", delimiter=",")
 
+    # Convert labels: in PROTEINS_full, 1 -> Enzyme, 2 -> Non-Enzyme
     binary_labels = np.where(labels == 1, 1, 0)
 
     graphs = []
     n_graphs = np.max(graph_indicator)
 
+    # Build empty graphs and add nodes with attributes
     for i in range(1, n_graphs + 1):
         G = nx.Graph()
-        node_idx = np.where(graph_indicator == i)[0]
-
+        node_idx = np.where(graph_indicator == i)[0]  # indices (0-based)
         for idx in node_idx:
-            G.add_node(idx, attr=node_attr[idx])
-
+            # attach attribute vector under key 'attr'
+            G.add_node(int(idx), attr=node_attr[int(idx)])
         graphs.append(G)
 
-    for u, v in edges:
-        u -= 1
-        v -= 1
-        g_id = graph_indicator[u]
-        if graph_indicator[u] == graph_indicator[v]:
-            graphs[g_id - 1].add_edge(u, v)
+    # Add edges (TUDataset edges are 1-based indexes)
+    if edges.size > 0:
+        # edges might be shape (m,2) or (2,) for single edge - handle both
+        edges = np.atleast_2d(edges)
+        for u, v in edges:
+            u0 = int(u) - 1
+            v0 = int(v) - 1
+            # add edge if nodes belong to same graph (graph_indicator is 1-based)
+            if graph_indicator[u0] == graph_indicator[v0]:
+                g_idx = int(graph_indicator[u0] - 1)
+                # map node IDs to nodes used in G (we used original indices)
+                graphs[g_idx].add_edge(u0, v0)
 
     return graphs, binary_labels
